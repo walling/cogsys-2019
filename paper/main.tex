@@ -1,0 +1,590 @@
+\documentclass[twocolumn]{article}
+
+%-- Setup text fonts --
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Pagella}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+
+%-- Setup language --
+%\usepackage{polyglossia} % Not fully compatible with biblatex
+%\setmainlanguage[variant=american]{english}
+\usepackage[american]{babel}
+\usepackage[strict=true,autostyle=true,english=american]{csquotes}
+
+%-- Math tools --
+\usepackage{amsmath}
+\DeclareMathOperator*{\argmax}{argmax}
+\DeclareMathOperator*{\argmin}{argmin}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+
+%-- Setup math fonts --
+\usepackage{unicode-math}
+\setmathfont{TeX Gyre Pagella Math}
+
+%-- Code listings --
+\usepackage{listings}
+\usepackage{xcolor}
+\definecolor{verylightgray}{rgb}{.97,.97,.97}
+
+%-- Load abstract --
+\usepackage{abstract}
+
+%-- Graphics --
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{censor}
+\usepackage{pdflscape}
+
+%-- Citations --
+\usepackage{xpatch}
+\usepackage[backend=biber,style=apa,language=american]{biblatex}
+\DeclareLanguageMapping{american}{american-apa}
+\addbibresource{citations.bib}
+
+%-- Links and PDF setup --
+\usepackage[]{hyperref}
+\hypersetup{
+    unicode=true,
+    colorlinks=true,
+    breaklinks=true,
+    bookmarksnumbered=true,
+    pdfpagemode=UseNone,
+    pdftitle={Implementing visio-acoustic associative memory model for fast mapping of word categories in small children},
+    pdfauthor={Bjarke Walling},
+    pdfsubject={The computational model of Gliozzi and Madeddu (2018) for fast mapping of associative visio-acoustic stimuli is introduced and implemented. A detailed report of the setup of the model experiments is given, including implementation details of the model as well as parameters for specific fine-tuning of the model. The model is evaluated through four pre-experiments. The main results are in agreement with the original model in terms of the mapping of the input stimuli categories, and in disagreement with the original model in terms of the generalization of categories and the taxonomic factor. A discussion relates the results to the original model. Some shortcomings in the original model and implementation are mentioned, and suggestions are given for further research directions.},
+    pdfkeywords={Associative Learning, Word Acquisition, Growing Self-Organizing Maps, Hebbian Connections},
+    linkcolor={red!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black},
+}
+%\usepackage{url} % Not used
+%\usepackage{breakurl}
+
+%-- Title --
+\usepackage{titling}
+\title{Implementing visio-acoustic associative memory model for fast mapping of word categories in small children}
+\author{Bjarke Walling\thanks{Computer Science Bachelor 5th Semester, Freie Universität, Berlin. E-mail: \href{mailto:bjarke.walling@fu-berlin.de}{\texttt{bjarke.walling@fu-berlin.de}}}}
+\date{February 25, 2019}
+\renewcommand{\maketitlehookd}{%
+\vspace{1mm}
+\begin{abstract}
+\noindent The computational model of Gliozzi and Madeddu (2018) for fast mapping of associative visio-acoustic stimuli is introduced and implemented. A detailed report of the setup of the model experiments is given, including implementation details of the model as well as parameters for specific fine-tuning of the model. The model is evaluated through four pre-experiments. The main results are in agreement with the original model in terms of the mapping of the input stimuli categories, and in disagreement with the original model in terms of the generalization of categories and the taxonomic factor. A discussion relates the results to the original model. Some shortcomings in the original model and implementation are mentioned, and suggestions are given for further research directions.
+
+\vspace{2mm}
+\noindent \textbf{Keywords:} Associative Learning, Word Acquisition, Growing Self-Organizing Maps, Hebbian Connections
+\end{abstract}
+}
+
+\begin{document}
+%\StopCensoring  %-- TODO: For production PDF --
+\begin{titlepage}
+\noindent
+Freie Universität Berlin\\
+FB Informatics / Mathematics\\
+Cognitive Systems Seminar\\
+Winter Term 2018/19\\
+Instructor: Ana-Maria Olteteanu
+\vspace{4.5cm}
+\begin{center}
+{\LARGE \textbf{Implementing visio-acoustic associative memory model for fast mapping of word categories in small children} \par}
+\end{center}
+\vspace{8.7cm}
+\noindent
+Bjarke Walling\\
+\censor{xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}\\
+bjarke.walling@fu-berlin.de\\
+Computer Science Bachelor, 5th Semester\\
+\censor{xxxxxxxxxxxxxxxxxxxxxxxxxx}
+\end{titlepage}
+\maketitle
+
+\section{Introduction} \label{sec:introduction}
+In recent years, machine learning models proposed super-human performance in tasks like phone transcription and object recognition. However, it's generally not true that these models surpass humans \parencite{chang_seven_2019}. The models only tend towards super-human performance, when tested with the data sets in which they were trained.
+
+The next natural step would be for computational models to independently learn by associating various input stimuli from the environment (visual, acoustic, sentiment, etc.). This approach is similar to the way children learn. Specifically, this paper is looking at a computational model for word acquisition in small children.
+
+The focus of this paper is a replication experiment of \citeauthor{gliozzi_visual_2018}'s (\citeyear{gliozzi_visual_2018}) computational model. An overview of related work (\autoref{sec:related-work}) is given, the setup of the experiment is explained (\autoref{sec:experiment-setup}), followed by the results (\autoref{sec:results}). The discussion (\autoref{sec:discussion}) relates the findings to previous work and gives a perspective on future directions.
+
+The content was partly developed from a presentation previously held by the author \parencite{walling_visual_2018}.
+
+\textcite{markman_whole-object_1991} discussed three constraints, whereby children about 18 months old acquire words: 1) whole-object; 2) mutual exclusivity; and 3) taxonomic constraints. The whole-object constraint focuses on connecting words with the whole object instead of its parts, e.\,g., children would focus on the whole tree instead of looking at each branch. With the mutual exclusivity constraint, new words are rejected if a word connection for a given object is already formed, e.\,g., children would first reject \enquote{vehicle} for the same objects as represented by \enquote{car}. The taxonomic constraint connects words foremost with categories instead of single entities, e.\,g., \enquote{bird} is a word for all types of birds, not just a name of a single bird. If it were not for these constraints, too many irrelevant connections between words and objects would be constructed in the early stages of building a vocabulary.
+
+The word-object connections are based on associations between various sensory inputs or multimodal experience in general. If a child sees a red ball and hears the words \enquote{red ball} around the same time, a connection is slowly being formed. A computational model implementing this learning strategy could be used in at least two regards: 1) enable computer systems to dynamically learn associations from sensory input given by users; 2) guide researchers to figure out how children acquire words by validating and comparing the model with real data.
+
+On the following pages, a model is presented that can perform fast mapping between two types of sensory input, namely visual and acoustic stimuli or inputs. Stimuli has a connotation to real-life agents, whereas inputs typically relates to a computational model or software systems. The words stimuli and inputs will be used interchangeably.
+
+Three properties of the model are worth mentioning: 1) it uses an dynamic and unsupervised learning regime, meaning that it doesn't make any narrow assumptions about the input data; 2) it inherently creates a bi-directional mapping or association between the two types of input data, meaning that it knows the word connected with an object as well as remembering the object connected with the word; and 3) it applies a topological ordering to the associations in a 2D space, which facilitates an interpretation of the model. In theory, associative categories or clusters are mapped close together in this 2D space. This can also be used to visualize the map as a diagram for humans to interpret. Because of the fast mapping of sensory associations, it would also be possible to use this model to bootstrap other more complex models. Furthermore, the model could be used as a foundation for further models in cognitive systems.
+
+\section{Related Work} \label{sec:related-work}
+\textcite{mayor_neurocomputational_2010} built the first version of this computational model based on Self-Organizing Maps (SOMs) and Hebbian connections. SOMs are a type of neural network using unsupervised learning to map input data in a topological 2D space. However, the SOMs are of a fixed size, leading to a static training regime, i.\,e., the training set must be fixed beforehand. This doesn't fit the notion of how children learn. Another difficulty is the a priori determination of the map size. If the map size is too large, it wastes computational resources. If it's too small, it leads to catastrophic forgetting; a phenomenon in neural networks, where previously learned data is suddenly lost, because of exhaustion of the memory resources (neuron weights) in the network. The Hebbian connections ensure the actual associations between the two topological SOM maps.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.4\textwidth]{img/model-diagram.pdf}
+\caption{Diagram of the computational model with two GSOM maps (left and right) and Hebbian connections between neurons on the maps (middle). The colors on the maps represent various learned categories clustered in a 2D topology. The thickness of the Hebbian connections characterize the strength between the neurons \parencite{walling_visual_2018}.}
+\end{figure}
+
+\textcite{gliozzi_visual_2018} improved upon this model. Their main contribution was to make the training regime dynamic. In order to do that, they used Growing Self-Organizing Maps (GSOMs) instead of static SOMs. GSOMs expand the size of their maps as needed in order to preserve the previously learned associations as well as the new associations from the currently learned input data. In that way, the map size doesn't need to be fixed in the beginning, enabling the training of any amount of input data. The main downside is the added complexity to the model, especially with regards to the Hebbian connections. When expanding the GSOM maps, the Hebbian connection weights should be expanded accordingly.
+
+Other models based on deep learning (deep neural networks) have been used a lot in recent years to map sensory data to categories or labels, e.\,g., images and video (visual data), speech (acoustic/audio data), sentiment (textual data), etc. However, they are mainly based on a supervised learning regime, meaning you have to acquire large datasets and manually tag each image or sound clip with an appropriate category/label. They are also usually uni-directional models, so they can interpret the input data as a label, but another model is needed to generate images given a category. Lastly, they are difficult to interpret, which means they become a black-box model that you have to trust. The model in this paper doesn't have these drawbacks as already discussed in the \nameref{sec:introduction}.
+
+Apart from minor adjustments, this paper replicates the experiments of \textcite{gliozzi_visual_2018}:
+\begin{itemize}
+    \item
+        An open-source re-implementation of the model in the Python programming language using the popular Numpy library \parencite{numpy_developers_numpy_2018}.
+    \item
+        A scaled-down pre-experiment to ensure that the model works well before scaling up the number of input stimuli.
+    \item
+        Using real-life acoustic variants from multiple human speech recordings instead of applying a normal distribution to the acoustic stimuli vectors. This is similar to the original approach of \textcite{mayor_neurocomputational_2010}.
+\end{itemize}
+
+\section{Experiment Setup} \label{sec:experiment-setup}
+This section offers a detailed description of the input data and model as well as the various parameters relevant for the model.
+
+\subsection{Categories} \label{sub:categories}
+The goal is for the model to learn object-word associations and generalize well for categories. A category can be seen as a distinct concept to learn and consists of a prototypical object and its associated word. Variants (distortions of input stimuli) of each prototype are created in order to align the training set to a real-life learning experience. A simplifying assumption is that objects are visual and words are acoustic sensory experiences. In reality, categorical learning is most likely performed through multimodel sensory experiences. A list of 100 categories is created, i.\,e., 100 prototypes of both visual and acoustic stimuli as well as 24 variants of each prototype.
+
+\subsection{Visual Stimuli} \label{sub:visual-stimuli}
+Prototypes of visual stimuli are represented as uniformly distributed random dot patterns consisting of 9 dots on a $30 \times 30$ grid. See \autoref{fig:dot-pattern-example} for excerpts of 5 categories. The random dot patterns have been researched in the cognitive systems literature and shown to be a good base representation for visual categories \parencite{posner_perceived_1967}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.4\textwidth]{img/dot_pattern_example.png}
+\caption{Visual dot patterns for categories 21--25. The leftmost column is the prototype and the remaining columns are the variants 1--12 (1--8 low distortion, 9--12 medium distortion). The image was generated in Python from the raw data using PIL image library.}
+\label{fig:dot-pattern-example}
+\end{figure}
+
+Variants are created by distorting the prototypes and moving the dots according to normal distributions in the x and y direction with the additional condition that the dots can not move outside the grid and two dots can not be on the same position, i.\,e., there will still be 9 dots after the distortion function. Following this strategy, 8 low distortion variants with standard derivation $\sigma = 1$ are created as well as 8 medium distortion variants with $\sigma = 2$ and 8 high distortion variants with $\sigma = 3$ for a total of 24 variants. The prototypes are excluded in the training set.
+
+The data is available in the code repository (see below) in the \texttt{data/1-visual/} folder.
+
+\subsection{Acoustic Stimuli} \label{sub:acoustic-stimuli}
+In case of the acoustic stimuli, a strategy similar to the random dot patterns for visual stimuli can not be followed. Some uncertainty about how the brain processes acoustic signals still exists. The solution is to record words spoken by a human speaker and translate the audio signal without discarding important information. The first step is to build a list of words that small children or toddlers could be taught. The second step is to record each selected word (prototype) multiple times (distorted variants) by a human speaker.
+
+\subsubsection{Word lists} \label{sub:word-lists}
+A quick literature review is performed. Four resources are found related to initial words acquired by children. The four resources are listed in \autoref{tab:word-resources}.
+
+\begin{table}[ht]
+    \centering
+    \begin{tabular}{llcll}
+        $N$ & Resource & \#Words & Reference \\
+        \hline
+        \hline
+        1 & Website & 100 & \textcite{jonjiv_ive_2017} \\
+        \hline
+        2 & Article & 26 & \textcite{plunkett_learning_2005} \\
+        \hline
+        3 & Article & 49 & Bloom et al. (\citeyear{bloom_words_1993}) \\
+        \hline
+        4 & Website & 64 & Springer N. L. (\citeyear{springer_nature_limited_words_nodate}) \\
+        \hline
+    \end{tabular}
+    \caption{Resources used as the basis for building a word list.}
+    \label{tab:word-resources}
+\end{table}
+
+The four word lists are manually augmented with word sense (grouping similar sounding words), part-of-speech (POS) tag, number of words, number of syllables, and finally an exclusion choice when relevant.
+
+The word sense is the basic category the word represents, e.\,g., the words \enquote{papa}, \enquote{dada}, and \enquote{daddy} all bear the same meaning of \enquote{dad} and can thus be seen as acoustic stimuli for the same category. The POS tag is the grammatical type of word, e.\,g., whether it's primarily seen as a noun, verb, interjection, etc. Number of words count the words in the context of pauses in the speech, i.\,e., \enquote{it's} and \enquote{uh-oh} are both counted as one word. The same applies for the number of syllables. The number of words and syllables are later used for one of the exclusion principles in order to prevent recording longer phrases like \enquote{night night} (two words) or \enquote{banana} (three syllables). The model is meant to work with monosyllabic words, but single words with two syllables are included as well.
+
+The exclusion choice is based on four principles: 1) Proper nouns are excluded, because they represent a single entity and does not generalize to word categories; 2) Sound nouns like \enquote{choo-choo} or \enquote{moo} are excluded, because they don't associate with visual objects; 3) Words that are too different or archaic from the rest with a similar word sense, e.\,g., \enquote{bow-wow} with the sense \enquote{dog} is excluded, since its sound pattern is too different from \enquote{dog} / \enquote{doggie}; and 4) phrases (more than one word) or long words (more than two syllables) are excluded, because the model is built with monosyllabic words in mind.
+
+The remaining part is to select the 100 word senses to be recorded. The words are grouped by their word sense. Word senses with more than one entry (e.\,g., \enquote{apple} occurs 3 times) are directly selected. To reach a list of 100, the remaining word senses are picked at random sampled according to the POS tag distribution of the complete list. The last criterion ensures the same relative distribution of nouns, verbs, etc. in the final list.
+
+Some word senses have words with a slight variation. In those cases, the recording will alternative between the words, e.\,g., for the word sense \enquote{bird} the speaker is switching between \enquote{bird} and \enquote{birdie} for the repetitions (variants).
+
+\subsubsection{Recording audio} \label{sub:recording-audio}
+For the main experiment, the goal is to record all 100 word categories with 24 variants each (19 low distortion variants recorded by a human female speaker; 5 high distortion variants recorded by a human male speaker). The low/high distortion variants are thus split 80\%/20\%.
+
+Since sound processing (studio setup, recording, cutting, etc.) is a labor intensive task, an initial batch of 33 categories and 19 low distortion variants are created. The intention is to record the remaining 67 categories and full 24 low and high distortion variants after the pre-experiments goals have been reached (\autoref{sec:results}).
+
+The recordings are made using semi-professional home studio equipment. Each batch (repetitions for a single word sense and a single speaker) is cut, DC-normalized, background noise removal is performed, and amplitude-normalized (both channels, stereo recording), using the open source sound editor Audacity.
+
+Finally, each batch is processed by a program that cut outs each word repetition. It works by detecting word pauses, where the power spectrum of human voice frequencies (85-3400 Hz) is low and using a statistic to exclude false positives (60~\% percentile of the power, 300\~ms minimum duration). Each word is cut tight at the boundaries and a short 50\~ms fade-in/fade-out is applied at the ends. The cut out word is time stretched to 400\~ms without changing the pitch. Finally, 7 Mel-frequency cepstral coefficients (MFCCs) are extracted at 4 sample points in time, leading to a vector of 28 real numbers. This process is automatically repeated for each recorded word.
+
+According to \textcite{mayor_neurocomputational_2010}, 3 sample points in time are enough for the model to perform well on monosyllabic words. By sampling 4 times, there could be a bit of leeway for the model to perform well on words with two syllables.
+
+All data, complete and selected word lists as well as recordings and processing code, is available in the code repository in the \texttt{data/2-acoustic/} folder.
+
+\subsection{Growing Self-Organizing Maps} \label{sub:gsom}
+A description of a Self-Organizing Map (SOM) with a fixed size is given, followed by a additions of a Growing Self-Organizing Map (GSOM). A SOM is a neural network laid out in a 2D grid forming the map. Each neuron (also called a unit) with the index $i$ represents a concept or category and has a weight vector $w_i$ with the same size as the input vector $x$. The quantization error $e_i$ for a given unit on the map is the Euclidean distance of its weight vector $w_i$ and the input vector $x$: \[
+e_i \coloneq \norm{w_i - x}
+\]
+An important concept is the Best-Matching Unit (BMU), it's the unit $j$ with lowest quantization error: \[
+j \coloneq \argmin_{i} {e_i}
+\]
+The BMU is the unit that is chosen to represent the given input data $x$.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.2\textwidth]{img/model-error-field.pdf}
+\caption{Diagram of selecting the Best-Matching Unit (BMU) with the lowest quantization error from the whole error field based on the Euclidean distance between the input stimuli $x$ and the weights of each neuron \parencite{walling_visual_2018}.}
+\end{figure}
+
+The weights are initialized with small random numbers uniformly distributed in the interval $[0; 0.01)$. The map is trained by updating the weights in order to lower the quantization error for the given input vector. A detailed description of the training procedure can be found in \autoref{sub:training}.
+
+A GSOM has the same basic working principles, but it also includes a Growing Procedure. If the quantization error $e_j$ of the BMU $j$ exceeds a threshold, the map will expand by inserting a row or column; see \autoref{sub:growing}. The GSOM supports interleaving training and activation, i.\,e., it doesn't need to be two distinct phases.
+
+The computations can be made more efficient by representing the weights as a 3D tensor $W$ with shape $(width, height, depth)$. The error field (matrix with all $e_i$'s) can then be calculated in one go (the raised 3 means that the Euclidean distance is calculated on the 3rd axis, i.\,e., the depth axis): \[
+E \coloneq \norm{W - x}^3
+\]
+
+\subsection{Hebbian Connections} \label{sub:hebbian}
+The Hebbian Connections ensure the associations between the units on two distinct GSOMs. One way of modelling this mathematically is to look at the connection weight $h_{ij}$ between unit $i$ on the first map and unit $j$ on the second map. This leads to a matrix representation with all connection weights between units on the two maps. However, it doesn't take into consideration that the maps consist of units in a 2D grid.
+
+When one of the maps are expanded, the Hebbian connections also need to expand. Accordingly, a better representation for the Hebbian weights is a 4D tensor. Let $(x_1, y_1)$ be the location of the BMU on the first map and $(x_2, y_2)$ be the location of the BMU on the second map. A 4D tensor with the connection weights between these units can be constructed. The tensor $H$ has the shape $(width_1, height_1, width_2, height_2)$. One way to think about this 4-dimensional object is as a matrix consisting of matrices: \[
+H =
+\begin{bmatrix}
+    \left[ \ddots \right] & \cdots & \left[ \ddots \right] \\
+    \vdots & \ddots & \vdots \\
+    \left[ \ddots \right] & \cdots & \left[ \ddots \right]
+\end{bmatrix}
+\]
+The connection weight between the two BMUs is then $H_{(x_1, y_1, x_2, y_2)}$.
+
+\subsection{Training Procedure} \label{sub:training}
+The training procedure consists of two parts: 1) updating the GSOM weights; and 2) updating the Hebbian connections. The first GSOM is presented with input $x$ and the BMU $i$ with location $(x_1, y_1)$ is chosen. The second GSOM is presented with the associated input $y$ and the BMU $j$ with location $(x_2, y_2)$ is chosen.
+
+In order to update the weights for one of the GSOMs, an input stimuli $x$ is first presenting and a BMU $j$ with location $(x, y)$ is chosen. The weights are updating to be more similar to the input $x$ (lowering the quantization error) around the BMU using a Gaussian filter, so the strongest change is at the BMU itself. The weights are updated according to the following formula: \[
+w_k' \coloneq w_k + \alpha \, g(j, k) \, (x - w_k)
+\]
+The $w_k'$ represents the weights after the update for unit $k$ and $w_k$ represents the weights before the update for unit $k$.
+
+The learning rate $\alpha \in [0;1]$ decides how fast the change is applied. With $\alpha = 0$, the formula reduces to $w_k' \coloneq w_k$, where the old weights are kept and no change occur at all. With $\alpha = 1$, the formula reduces to $w_k' \coloneq w_k + g(j, k) \, (x - w_k)$, which is the maximal change possible. For the BMU itself, $g(j, k) = 1$ such that $w_k' \coloneq w_k + (x - w_k) = x$, which means that for $\alpha = 1$ the weights are set exactly equal to the input vector $x$. For any value between 0 and 1, the learning rate decides between these two extremes.
+
+The neighborhood function is the Gaussian filter function with the distance function $d(j, k)$ calculating the Euclidean distance on the map between units $j$ and $k$: \[
+g(j, k) \coloneq e^{-\frac{d(j, k)^2}{2\sigma^2}}
+\]
+By changing the width of the neighborhood $\sigma$, the number of affected neighboring units can be decided.
+
+This experiment uses a learning rate $\alpha$, starting at 0.7 and decreasing linearly to 0.0002 by the end of the experiment. The neighborhood width $\sigma$ is starting at 1.0 and decreasing linearly to 0.25.
+
+Finally, the Hebbian connections between the two BMUs need to be updated. A Gaussian function with $\sigma = 0.5$ is calculated on each map with the center in the BMU. Let those two matrices be called $M_1$ and $M_2$. The dot product is added to the Hebbian weight tensor: \[
+H' \coloneq H + M_1 \cdot M_2
+\]
+In the model of \textcite{gliozzi_visual_2018}, the direct connections between the BMUs are increased by 1 and the neighbors of the BMUs ($8 \times 8 = 64$ units) are increased by 0.1. In some preliminary tests, this didn't seem to perform well. Instead, the update using a Gaussian function was chosen.
+
+\subsection{Growing Procedure} \label{sub:growing}
+As part of the training, the GSOM can grow or expand the map. This happens when the quantization error for the BMU $j$ exceeds a threshold, i.\,e., $e_j > k \, e'_j$, where $e_j$ is the quantization error and $e'_j$ is the previous error for the same unit. The threshold parameter $k$ determines the expansion rate. If $k$ is near or lower than 1, it's easy for the quantization error to exceed the threshold, and the map will often be expanded. If $k$ is much higher than 1, the quantization error will rarely exceed the threshold, and the map is growing at a slower rate. This experiment uses $k = 4$.
+
+When an expansion is decided, a row or column is inserted next to the BMU. The direction at which the row or column is inserted is based on the neighboring unit with the lowest quantization error for the current input $x$. \textcite{gliozzi_visual_2018} didn't clarify how to calculate the weights of the new row or column. In the experiment, the weights of the new row or column are initialized to normal distributed random weights based on statistics of the current error field. Afterwards, a Gaussian filter is applied to distribute part of the neighboring units weights to the newly inserted row or column. For this Gaussian filter a fixed width of $\sigma_{\textrm{expand}} = 0.1$ is used. To rephrase, the steps involved in the growing procedure are:
+\begin{enumerate}
+    \item
+        Find BMU $j$ and calculate quantization error $e_j$
+    \item
+        Compare quantization error $e_j$ with the threshold $k \, e'_j$ of the previous quantization error $e'_j$ of this unit
+    \item
+        If the quantization error exceeds the threshold, the map is expanded:
+        \begin{itemize}
+            \item
+                Find directly neighboring unit $k$ with the next lowest quantization error
+            \item
+                Insert row or column in the direction of the chosen neighboring unit
+            \item
+                Initialize the weights of the row/column with random values according to the normal distribution statistics of the current error field
+            \item
+                Run a Gaussian filter with width $\sigma_{\textrm{expand}} = 0.1$ on the row/column to distribute weights from neighboring units
+        \end{itemize}
+\end{enumerate}
+
+\subsection{Activation} \label{sub:activation}
+When the model is activated, it infers the associated stimulus for a given input vector. There's nothing inherently asymmetrical in the model, and it can indeed be activated bi-directional and infer stimulus in both directions. For the activation, one of the GSOMs are designated as input and the other as output.
+
+For a given input stimulus $x$, the activation of each unit on the input GSOM is calculated as follows: \[
+a_i \coloneq e^{-e_i}
+\]
+The activation of all units can be represented as a matrix $A$ with the same shape as the input GSOM map. This matrix is then propagated through the Hebbian connections by applying the dot product on the two first indices of the Hebbian weight tensor: \[
+B \coloneq A \cdot H
+\]
+The matrix $B$ is the activation of all units on the output GSOM. In the end, the unit $j$ with the highest activation is chosen: \[
+j \coloneq \argmax_{i} b_i
+\]
+This is the unit representing the associated stimulus for the given input vector.
+
+If propagating the activation in the other direction, it is calculated as follows on the two last indices of the Hebbian weight tensor: \[
+A \coloneq H \cdot B
+\]
+This is the same formula except that the activation matrix has moved to the other side of the dot product.
+
+\subsection{Evaluation} \label{sub:evaluation}
+In order to evaluate the model, it is activated with various input stimuli. For each activation, the associated output stimulus is checked. If the output stimulus matches the category of the input stimulus, the model is said to correctly map the stimulus. The output stimulus is checked by a nearest neighbor algorithm of all categories on the output map. For instance, if the model receives a visual stimulus for the object \enquote{tree} and it associates it with the acoustic stimulus for the word \enquote{tree}, it's correctly mapped.
+
+If the model is correct in more than 80~\% of all variants of a category, the model is said to generalize this category. The production test factor is the percent of generalized categories, when starting out with visual stimuli (mapping the word given an object). The comprehension test factor is the percent of generalized categories, when starting out with acoustic stimuli (mapping the object given a word). The taxonomic factor, how well the model generalize over all categories, is the average of the production and comprehension test factors.
+
+\subsection{Code Repository} \label{sub:code-repository}
+This paper strives to make research projects easily repeatable. In case of computational models, this could be an achievable goal. All the original and derived data as well as code for the model and processing the data is published in an online code repository on Github:
+\begin{center}
+\url{https://github.com/walling/cogsys-2019}
+\end{center}
+
+\section{Results} \label{sec:results}
+To test the model, four pre-experiments and a main experiment are designed, see \autoref{tab:experiments} in the end of this article for an overview.
+
+To sum it up, the two first pre-experiments are trained and tested with the maps only and no Hebbian connections. For evaluation purposes, the maps are self-activated (selecting the BMU for each validation input). The final two pre-experiments are trained using Hebbian connections and the activation is going through the Hebbian connections as well. Each pair of pre-experiments includes one test with a statically sized SOM (grid size $30 \times 30$) and one test with a growing GSOM (grid size starting at $10 \times 10$). All pre-experiments are run for 3 rounds, 20 epochs each. Only 30 categories and 12 variants in each category (360 variants in total) are used. See \autoref{tab:results} for an overview of the results.
+
+The main experiment strives to train the model with Hebbian connections and the full 24 variants of all 100 categories (10 rounds, 300 epochs each, 2400 variants in total). This has not been executed as a result of unsatisfactory outcomes from the last two pre-experiments and a lack of time for this research project.
+
+\section{Discussion} \label{sec:discussion}
+Looking at the results in \autoref{tab:experiments} and \autoref{tab:results}, the main points are:
+\begin{enumerate}
+    \item
+        The pre-experiments 1 and 2 without Hebbian connections performed very well with an average 74.3~\% correctly mapped categories. This indicates that the SOM/GSOM maps are correctly learning and mapping the input stimuli in a reliable manner. The performance matches the results of \textcite{gliozzi_visual_2018}.
+    \item
+        The activation through Hebbian connections in pre-experiments 3 and 4 did not perform well with an average taxonomic factor of 7.9~\%. This is in disagreement with the results of \textcite{gliozzi_visual_2018}. More work might be needed to fine-tune the Hebbian connection model.
+    \item
+        The acoustic maps performed slightly better than the visual maps, when just measuring correct mappings. Also growing visual maps expand much faster than the acoustic maps, suggesting that the visual data is more difficult to map. This is in disagreement with \textcite{gliozzi_visual_2018}.
+    \item
+        The growing maps performed slightly better than the static maps, even when the final map is smaller in size. This is in agreement with the results of \textcite{gliozzi_visual_2018}. One reason might be that the Growing Procedure (\autoref{sub:growing}) forces better topology alignment of the data, since new stimuli with a high quantization error are going to be placed as a neighbor to the BMU, which forces the formation of new clusters of categories. The cost of inserting a new row/column is negligible in comparison.
+    \item
+        The comprehension test (average 14.0~\%) performed much better than the production test (average 1.9~\%), suggesting that either the mapping and Hebbian connections are skewed in favor of one side of the stimuli or there is a bug in the implementation.
+\end{enumerate}
+Multiple facets were explored in this paper. One being whether a model similar to \textcite{gliozzi_visual_2018} could be implemented quickly and reliably and the results verified. As the results have shown, the GSOM part of the model did seem to work well, however adding the Hebbian connections didn't fare well. One reason could be that the added complexity of the model made it unfeasible for proper test-driven development. Although the model is quite simple and easy to grasp in mathematical terms, the details did add a considerable amount of work during the implementation.
+
+Some procedures and parameters were not properly stated in the model of \textcite{gliozzi_visual_2018}. Some open questions or concerns, that were answered through specific parameter choices in this paper, are as follows:
+\begin{enumerate}
+    \item
+        The learning rate and neighborhood width are linearly changed over time, but it's not stated whether this is true for the duration of the whole experiment or restarting every epoch.
+    \item
+        The neighborhood width starts out at 1 and is decreasing linearly, but the final value is not published. In this paper, a range of 1 down to 0.25 was chosen, because it's hinted in the model of \textcite{mayor_neurocomputational_2010}.
+    \item
+        Expanding the GSOM map inserts a new row/column, but the initialization of the new unit weights were not considered in the original model.
+    \item
+        The precise function of the $\sigma_{\textrm{expand}}$ neighborhood width for inserts is not stated. Furthermore, it's not clear whether it should also change linearly over time. In this paper, a static value of 0.1 was used.
+\end{enumerate}
+Other concerns can be founded on the input stimuli and normalization procedures. The normalization of acoustic stimuli is only able to handle single words at a time. The visual dot pattern stimuli are high-dimensional sparse data, which can simulate neuron activations, but they do not map to real-world images. Future research could look into improving these parts as well as achieving a better understanding of the specific parameter choices of the model. One approach for further research could also be to integrate the properties of this model by pairing it with a deep learning model, thereby allowing more complex input stimuli and preserving the bi-directional mapping properties as well as a dynamic learning regime.
+
+\section{Conclusion} \label{sec:conclusion}
+An interesting computational model was implemented and tested in various ways. The results were compared with the original model, some were in agreement and some in disagreement. However, the original results could not be replicated accordingly. Some reasons were highlighted in the \nameref{sec:discussion}. The model itself have favorable properties compared with contemporary deep learning models, and further research is required in order to understand the tuning of the parameters as well as the limits of the model.
+
+\section*{Acknowledgements} \label{sec:acknowledgements}
+\addcontentsline{toc}{section}{\nameref{sec:acknowledgements}}
+Thanks goes to Lavinia Knop for help during the recordings and narrating the words.
+
+\printbibliography[heading=bibintoc]
+
+\section*{Tables} \label{sec:tables}
+\addcontentsline{toc}{section}{\nameref{sec:tables}}
+See the next page for tables related to the experiment setup and results.
+
+\begin{landscape}
+    \begin{table}
+        \centering
+        \begin{tabular}{lccccccccc}
+        $N$ & Model & Parameters & Map size & Activation & Visual map & Acoustic map & Visual CM & Acoustic CM & Taxonomic factor \\
+        \hline
+        \hline
+        1
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e01_model.pdf}
+            \end{minipage}
+            & \begin{minipage}{2cm}
+                \scriptsize
+                \#Categories: 30 \\
+                \#Variants: 12 \\
+                \#Epochs: 20 \\
+                Map: $30 \times 30$ \\
+                Expand: No \\
+                Self activation
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e01_size_graph.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e01_correct_graph.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e01_hit_map_v.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e01_hit_map_a.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e01_cm_v.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e01_cm_a.pdf}
+            \end{minipage}
+            & n/a
+            \\
+        \hline
+        2
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e02_model.pdf}
+            \end{minipage}
+            & \begin{minipage}{2cm}
+                \scriptsize
+                \#Categories: 30 \\
+                \#Variants: 12 \\
+                \#Epochs: 20 \\
+                Map: $10 \times 10$ \\
+                Expand: Yes \\
+                Self activation
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e02_size_graph.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e02_correct_graph.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e02_hit_map_v.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e02_hit_map_a.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e02_cm_v.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e02_cm_a.pdf}
+            \end{minipage}
+            & n/a
+            \\
+        \hline
+        3
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e03_model.pdf}
+            \end{minipage}
+            & \begin{minipage}{2cm}
+                \scriptsize
+                \#Categories: 30 \\
+                \#Variants: 12 \\
+                \#Epochs: 20 \\
+                Map: $30 \times 30$ \\
+                Expand: No \\
+                Using Hebbian
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e03_size_graph.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e03_tax_graph.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e03_hit_map_v.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e03_hit_map_a.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e03_cm_v.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e03_cm_a.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e03_tax_bar.pdf}
+            \end{minipage}
+            \\
+        \hline
+        4
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_model.pdf}
+            \end{minipage}
+            & \begin{minipage}{2cm}
+                \scriptsize
+                \#Categories: 30 \\
+                \#Variants: 12 \\
+                \#Epochs: 20 \\
+                Map: $10 \times 10$ \\
+                Expand: Yes \\
+                Using Hebbian
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_size_graph.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_tax_graph.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_hit_map_v.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_hit_map_a.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_cm_v.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_cm_a.pdf}
+            \end{minipage}
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_tax_bar.pdf}
+            \end{minipage}
+            \\
+        \hline
+        5
+            & \begin{minipage}{1.7cm}
+                \includegraphics[width=\linewidth]{img/e04_model.pdf}
+            \end{minipage}
+            & \begin{minipage}{2cm}
+                \scriptsize
+                \#Categories: 100 \\
+                \#Variants: 24 \\
+                \#Epochs: 300 \\
+                Map: $10 \times 10$ \\
+                Expand: Yes \\
+                Using Hebbian
+            \end{minipage}
+            & \multicolumn{7}{c}{The experiment was not executed.}
+            \\
+        \hline
+        \end{tabular}
+        \caption{Overview of the experiments and graphs of the results. Green is for visual maps and cyan for the acoustic maps. The visual and acoustic maps are examples picked at random. The remaining results are average of 10 runs and standard derivation is shown as error bars. The visual and acoustic confusion matrix (CM) represent which categories are mapped to which in 1 and 2 and through Hebbian connections in 3 and 4.}
+        \label{tab:experiments}
+    \end{table}
+
+    \begin{table}
+        \centering
+        \begin{tabular}{lllccccccc}
+        $N$ & Visual size & Acoustic size & Visual mapped & Acoustic mapped & Comprehension test & Production test & Taxonomic factor \\
+        \hline
+        \hline
+        1
+            & $900$
+            & $900$
+            & $82.7~\% \pm 11.4$
+            & $68.2~\% \pm 23.0$
+            & n/a
+            & n/a
+            & n/a
+            \\
+        \hline
+        2
+            & $649 \pm 5.7$
+            & $532 \pm 168.7$
+            & $74.2~\% \pm 10.5$
+            & $72.2~\% \pm 24.2$
+            & n/a
+            & n/a
+            & n/a
+            \\
+        \hline
+        3
+            & $900$
+            & $900$
+            & n/a
+            & n/a
+            & $13.0~\% \pm 9.0$
+            & $2.0~\% \pm 2.2$
+            & $7.5~\% \pm 5.1$
+            \\
+        \hline
+        4
+            & $649 \pm 4.2$
+            & $482 \pm 214.6$
+            & n/a
+            & n/a
+            & $15.0~\% \pm 12.5$
+            & $1.7~\% \pm 2.7$
+            & $8.3~\% \pm 7.2$
+            \\
+        \hline
+        \end{tabular}
+        \caption{Results from the four pre-experiments. Each value is noted with the standard derivation over 10 runs. The visual and acoustic mapped are the percent of correctly mapped categories activated on the map itself. The comprehension and production test are the percent of correctly generalized categories activated through the Hebbian connections. The taxonomic factor is the average of the previous two.}
+        \label{tab:results}
+    \end{table}
+\end{landscape}
+
+\end{document}
